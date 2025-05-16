@@ -1,0 +1,125 @@
+/* MCP Dashboard Styles */
+
+/* Main layout */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+}
+
+/* Header and navigation */
+.navbar-brand {
+  font-weight: bold;
+}
+
+/* Cards */
+.card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* Command parameters */
+pre {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* JSON output formatting */
+.json-key {
+  color: #7952b3;
+}
+
+.json-string {
+  color: #198754;
+}
+
+.json-number {
+  color: #fd7e14;
+}
+
+.json-boolean {
+  color: #0d6efd;
+}
+
+.json-null {
+  color: #adb5bd;
+}
+
+/* Status indicators */
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+.status-connected {
+  background-color: #198754;
+}
+
+.status-disconnected {
+  background-color: #dc3545;
+}
+
+/* Timeout specific styles */
+.timeout-alert {
+  border-left: 5px solid #fd7e14;
+}
+
+.timeout-container {
+  background-color: rgba(253, 126, 20, 0.1);
+  border: 1px solid rgba(253, 126, 20, 0.2);
+  border-radius: 0.25rem;
+}
+
+/* Error message formatting */
+.error-details {
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+  border-left: 3px solid #dc3545;
+  padding: 10px;
+}
+
+/* Timeout config form */
+.timeout-config {
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+}
+
+/* Animation for retry */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.retry-animation {
+  animation: pulse 1.5s infinite;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .card-body {
+    padding: 1rem;
+  }
+  
+  h1 {
+    font-size: 1.75rem;
+  }
+  
+  .display-4 {
+    font-size: 2.5rem;
+  }
+}

@@ -1,0 +1,32 @@
+<!-- Commands partial -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">MCP Commands</h5>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Description</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% commands.forEach(function(cmd) { %>
+            <tr>
+              <td><code><%= cmd.name %></code></td>
+              <td><%= cmd.description %></td>
+              <td>
+                <a href="/command/<%= cmd.name %>" class="btn btn-sm btn-primary">
+                  Use Command
+                </a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

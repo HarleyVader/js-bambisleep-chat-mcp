@@ -1,0 +1,55 @@
+{
+  "mcpServers": {
+    "milvus": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "./mcp-server-milvus/src/mcp_server_milvus",
+        "run",
+        "server.py",
+        "--milvus-uri",
+        "http://127.0.0.1:19530"
+      ]
+    },
+    "duckduckgo": {
+      "image": "mcp/duckduckgo:latest"
+    },
+    "fetch": {
+      "image": "mcp/fetch:latest"
+    },
+    "memory": {
+      "image": "mcp/memory:latest"
+    },
+    "puppeteer": {
+      "image": "mcp/puppeteer:latest"
+    }
+  },
+  "app": {
+    "name": "bambisleep-analyzer",
+    "version": "1.0.0"
+  },
+  "milvus": {
+    "collection": "bambisleep_data",
+    "vectorDimension": 1536,
+    "schema": {
+      "fields": [
+        {"name": "id", "type": "VARCHAR", "is_primary": true, "max_length": 100},
+        {"name": "url", "type": "VARCHAR", "max_length": 500},
+        {"name": "title", "type": "VARCHAR", "max_length": 200},
+        {"name": "content", "type": "VARCHAR", "max_length": 65535},
+        {"name": "summary", "type": "VARCHAR", "max_length": 1000},
+        {"name": "vector", "type": "FLOAT_VECTOR", "dim": 1536},
+        {"name": "source", "type": "VARCHAR", "max_length": 100},
+        {"name": "retrieved_at", "type": "VARCHAR", "max_length": 50}
+      ]
+    }
+  },
+  "search": {
+    "keywords": ["bambisleep", "bambi sleep", "bambi transformation", "bambi hypnosis"],
+    "maxResults": 30
+  },
+  "logging": {
+    "level": "info",
+    "format": "json"
+  }
+}

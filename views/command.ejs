@@ -1,0 +1,122 @@
+<%- include('partials/alerts') %>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1>Command: <code><%= command.name %></code></h1>
+  <a href="/" class="btn btn-outline-secondary">Back to Dashboard</a>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Command Details</h5>
+  </div>
+  <div class="card-body">
+    <p class="card-text"><%= command.description %></p>
+    
+    <% if (command.schema) { %>
+      <h6 class="mt-3">Parameters Schema:</h6>
+      <pre class="bg-light p-3 border rounded"><code><%= JSON.stringify(command.schema, null, 2) %></code></pre>
+    <% } %>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Execute Command</h5>
+  </div>
+  <div class="card-body">
+    <form id="command-form">      <div class="mb-3">
+        <label for="sessionId" class="form-label">Session ID</label>
+        <div class="input-group">
+          <input type="text" class="form-control" id="sessionId" name="sessionId" 
+                value="dashboard-<%= Date.now() %>" required>
+          <button class="btn btn-outline-secondary" type="button" id="generate-session-btn">
+            Generate New
+          </button>
+        </div>
+        <div class="form-text">Use a unique session ID or reuse an existing one.</div>
+      </div>
+        <div class="mb-3">
+        <label for="timeout" class="form-label">Timeout (ms)</label>
+        <input type="number" class="form-control" id="timeout" name="timeout" 
+               value="<%= command.name.includes('duckduckgo') ? 20000 : command.name.includes('fetch') ? 30000 : 30000 %>" min="1000">
+        <div class="form-text">Adjusted timeout values with auto-retry: 20000ms for DuckDuckGo, 30000ms for Fetch, 30000ms for others.</div>
+      </div>
+      
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="enableRetry" name="enableRetry" value="true" checked>
+        <label class="form-check-label" for="enableRetry">Enable Auto-retry (will attempt up to 3 times with increasing timeouts)</label>
+      </div>
+      
+      <% if (command.schema && command.schema.properties) { %>
+        <% Object.keys(command.schema.properties).forEach(function(param) { %>
+          <div class="mb-3">
+            <label for="param-<%= param %>" class="form-label">
+              <%= param %>
+              <% if (command.schema.required && command.schema.required.includes(param)) { %>
+                <span class="text-danger">*</span>
+              <% } %>
+            </label>
+            
+            <% const paramSchema = command.schema.properties[param]; %>
+            <% if (paramSchema.type === 'string') { %>
+              <input type="text" class="form-control" id="param-<%= param %>" name="<%= param %>"
+                    <% if (command.schema.required && command.schema.required.includes(param)) { %>required<% } %>>
+            <% } else if (paramSchema.type === 'number' || paramSchema.type === 'integer') { %>
+              <input type="number" class="form-control" id="param-<%= param %>" name="<%= param %>"
+                    <% if (command.schema.required && command.schema.required.includes(param)) { %>required<% } %>>
+            <% } else if (paramSchema.type === 'boolean') { %>
+              <select class="form-select" id="param-<%= param %>" name="<%= param %>"
+                    <% if (command.schema.required && command.schema.required.includes(param)) { %>required<% } %>>
+                <option value="true">True</option>
+                <option value="false">False</option>
+              </select>
+            <% } else if (paramSchema.type === 'array') { %>
+              <textarea class="form-control" id="param-<%= param %>" name="<%= param %>" rows="3"
+                      placeholder="Enter values as JSON array"
+                      <% if (command.schema.required && command.schema.required.includes(param)) { %>required<% } %>></textarea>
+            <% } else if (paramSchema.type === 'object') { %>
+              <textarea class="form-control" id="param-<%= param %>" name="<%= param %>" rows="5"
+                      placeholder="Enter JSON object"
+                      <% if (command.schema.required && command.schema.required.includes(param)) { %>required<% } %>></textarea>
+            <% } %>
+            
+            <% if (paramSchema.description) { %>
+              <div class="form-text"><%= paramSchema.description %></div>
+            <% } %>
+          </div>
+        <% }); %>
+      <% } %>
+      
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary">Execute Command</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Command Response</h5>
+  </div>
+  <div class="card-body">
+    <div id="command-result">
+      <p class="text-muted">Execute the command to see results here.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Form submission and results handling
+  document.addEventListener('DOMContentLoaded', function() {
+    // Generate new session ID when button is clicked
+    document.getElementById('generate-session-btn').addEventListener('click', function() {
+      document.getElementById('sessionId').value = `dashboard-${Date.now()}`;
+    });
+    
+    // Handle form submission
+    document.getElementById('command-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      executeCommand();
+    });
+  });
+</script>

@@ -1,0 +1,183 @@
+<!-- Adapter status partial -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">MCP Adapters</h5>
+    <button class="btn btn-sm btn-outline-primary" id="refresh-adapters-btn">
+      Refresh All
+    </button>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Adapter</th>
+            <th>Status</th>
+            <th>Default Timeout</th>
+            <th>Last Error</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% adapters.forEach(function(adapter) { %>
+            <tr id="adapter-row-<%= adapter.name %>">
+              <td>
+                <strong><%= adapter.name %></strong>
+                <% if (adapter.name === 'duckduckgo') { %>
+                  <span class="badge bg-secondary">Search</span>
+                <% } else if (adapter.name === 'fetch') { %>
+                  <span class="badge bg-secondary">Content</span>
+                <% } else if (adapter.name === 'memory') { %>
+                  <span class="badge bg-secondary">Storage</span>
+                <% } else if (adapter.name === 'milvus') { %>
+                  <span class="badge bg-secondary">Vectors</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (adapter.connected) { %>
+                  <span class="badge bg-success">Connected</span>
+                <% } else { %>
+                  <span class="badge bg-danger">Disconnected</span>
+                <% } %>
+              </td>              <td>
+                <% if (adapter.name === 'duckduckgo') { %>
+                  20000ms
+                <% } else if (adapter.name === 'fetch') { %>
+                  30000ms
+                <% } else { %>
+                  30000ms
+                <% } %>
+                <span class="badge bg-success ms-1">Retry: 3x</span>
+              </td>
+              <td id="adapter-error-<%= adapter.name %>">
+                <span class="text-muted">None</span>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button class="btn btn-sm btn-outline-primary" 
+                          onclick="checkAdapterHealth('<%= adapter.name %>')">
+                    Health Check
+                  </button>
+                  <button class="btn btn-sm btn-outline-info"
+                          data-bs-toggle="modal" 
+                          data-bs-target="#timeoutModal"
+                          onclick="prepareTimeoutModal('<%= adapter.name %>')">
+                    Configure
+                  </button>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Timeout Configuration Modal -->
+<div class="modal fade" id="timeoutModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Configure Adapter Timeouts</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="adapter-name">
+        <div class="mb-3">
+          <label for="adapter-timeout" class="form-label">Default Timeout (ms)</label>
+          <input type="number" class="form-control" id="adapter-timeout" min="1000" step="1000">
+          <div class="form-text">Recommended: 10000ms for DuckDuckGo, 15000ms for Fetch, 30000ms for others.</div>
+        </div>
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="adapter-retry">
+          <label class="form-check-label" for="adapter-retry">Enable Auto-retry for Commands</label>
+        </div>
+        <div class="alert alert-info">
+          <strong>Note:</strong> Changes will apply to all new commands using this adapter.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveAdapterConfig()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Adapter timeout configuration
+  function prepareTimeoutModal(adapterName) {
+    document.getElementById('adapter-name').value = adapterName;
+    
+    // Set default values based on adapter
+    let defaultTimeout = 30000;
+    if (adapterName === 'duckduckgo') defaultTimeout = 10000;
+    else if (adapterName === 'fetch') defaultTimeout = 15000;
+    
+    document.getElementById('adapter-timeout').value = defaultTimeout;
+    
+    // Get saved configuration from localStorage if available
+    const savedConfig = localStorage.getItem(`adapter-config-${adapterName}`);
+    if (savedConfig) {
+      const config = JSON.parse(savedConfig);
+      document.getElementById('adapter-timeout').value = config.timeout;
+      document.getElementById('adapter-retry').checked = config.retry;
+    }
+  }
+  
+  // Save adapter configuration to localStorage
+  function saveAdapterConfig() {
+    const adapterName = document.getElementById('adapter-name').value;
+    const timeout = parseInt(document.getElementById('adapter-timeout').value, 10);
+    const retry = document.getElementById('adapter-retry').checked;
+    
+    // Save to localStorage
+    localStorage.setItem(`adapter-config-${adapterName}`, JSON.stringify({
+      timeout,
+      retry
+    }));
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('timeoutModal'));
+    modal.hide();
+    
+    showAlert(`Configuration for ${adapterName} adapter has been saved.`, 'success');
+  }
+  
+  // Refresh all adapters
+  document.getElementById('refresh-adapters-btn').addEventListener('click', function() {
+    showAlert('Refreshing all adapters...', 'info');
+    
+    fetch('/health')
+      .then(response => response.json())
+      .then(data => {
+        if (data.adapters) {
+          Object.keys(data.adapters).forEach(adapterName => {
+            const adapterStatus = data.adapters[adapterName];
+            
+            // Update adapter UI
+            const statusCell = document.querySelector(`#adapter-row-${adapterName} td:nth-child(2)`);
+            const errorCell = document.querySelector(`#adapter-error-${adapterName}`);
+            
+            if (statusCell) {
+              statusCell.innerHTML = adapterStatus.status === 'ok' ? 
+                '<span class="badge bg-success">Connected</span>' : 
+                '<span class="badge bg-danger">Disconnected</span>';
+            }
+            
+            if (errorCell && adapterStatus.lastError) {
+              errorCell.innerHTML = `<span class="text-danger">${adapterStatus.lastError}</span>`;
+            } else if (errorCell) {
+              errorCell.innerHTML = '<span class="text-muted">None</span>';
+            }
+          });
+          
+          showAlert('All adapters refreshed successfully.', 'success');
+        }
+      })
+      .catch(error => {
+        showAlert(`Error refreshing adapters: ${error.message}`, 'danger');
+      });
+  });
+</script>

@@ -1,0 +1,43 @@
+# Version control
+.git
+.gitignore
+
+# Node.js
+node_modules
+npm-debug.log
+
+# Development and test files
+tests/
+*.test.js
+.eslintrc
+.prettierrc
+
+# Docker related
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Data and logs (should be mounted as volumes)
+data/
+logs/
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+docs/
+
+# Temporary files
+tmp/
+*.tmp

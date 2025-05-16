@@ -1,0 +1,12 @@
+<!-- Alerts and notifications partial -->
+<% if (typeof alerts !== 'undefined' && alerts.length > 0) { %>
+  <% alerts.forEach(function(alert) { %>
+    <div class="alert alert-<%= alert.type %> alert-dismissible fade show" role="alert">
+      <%= alert.message %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  <% }); %>
+<% } %>
+
+<!-- Dynamic alerts added by JavaScript -->
+<div id="alerts-container"></div>

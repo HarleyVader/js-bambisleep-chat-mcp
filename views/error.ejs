@@ -1,0 +1,16 @@
+<h1 class="text-danger mb-4">Error</h1>
+
+<div class="alert alert-danger">
+  <h4 class="alert-heading">Error Message:</h4>
+  <p><%= error.message %></p>
+  
+  <% if (error.stack && error.stack.length > 0) { %>
+    <hr>
+    <h5>Stack Trace:</h5>
+    <pre class="mb-0"><%= error.stack %></pre>
+  <% } %>
+</div>
+
+<div class="mt-4">
+  <a href="/" class="btn btn-primary">Return to Dashboard</a>
+</div>
