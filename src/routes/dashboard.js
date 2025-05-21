@@ -118,16 +118,19 @@ dashboardRouter.post('/api/execute', async (req, res) => {
     while (retryCount < maxRetries) {
       try {
         // Calculate timeout with backoff for retries
-        const retryTimeout = timeout ? Number(timeout) * (retryCount + 1) : undefined;
-        
+        const retryTimeout = timeout ? Number(timeout) * (retryCount + 1) : undefined;        // Create a well-formed command object with enhanced validation safeguards
         const cmdRequest = {
-          command,
-          sessionId,
-          id: `dashboard-${Date.now()}`,
+          command: String(command).trim(), // Force to string and trim for safety
+          sessionId: String(sessionId || 'dashboard').trim(), // Ensure string type with default
+          id: `dashboard-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`, // More unique ID
+          timestamp: new Date().toISOString(),
           parameters: {
             ...processedParams,
             // Add timeout to parameters if it's provided
-            ...(retryTimeout && { timeout: retryTimeout })
+            ...(retryTimeout && { timeout: retryTimeout }),
+            // Add source info to help with debugging
+            _source: 'dashboard',
+            _retryCount: retryCount
           }
         };
         

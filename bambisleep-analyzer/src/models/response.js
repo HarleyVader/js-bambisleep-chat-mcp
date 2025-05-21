@@ -27,49 +27,103 @@ export class Response {
   /**
    * Create an error response
    * @param {string} sessionId - Session identifier
-   * @param {Object} error - Error details
-   * @param {string} error.type - Error type
-   * @param {string} error.message - Error message
-   * @param {string} [error.code] - Error code
-   * @param {Object} [error.details] - Additional error details
+   * @param {Object|Error} error - Error details or Error object
    * @returns {Response} Response instance
    */
   static error(sessionId, error) {
+    // Map common error types to standardized MCP error types
+    let errorType = 'Error';
+    let errorCode = 'UNKNOWN_ERROR';
+    let errorMessage = 'An unknown error occurred';
+    let errorDetails = {};
+    
+    // Handle Error objects
+    if (error instanceof Error) {
+      errorType = error.name || 'Error';
+      errorMessage = error.message || errorMessage;
+      errorCode = error.code || this._mapErrorTypeToCode(errorType);
+      errorDetails = error.details || {};
+      
+      // Include stack trace in details during development
+      if (process.env.NODE_ENV === 'development') {
+        errorDetails.stack = error.stack;
+      }
+    } 
+    // Handle error info objects
+    else if (typeof error === 'object' && error !== null) {
+      errorType = error.type || errorType;
+      errorCode = error.code || this._mapErrorTypeToCode(errorType);
+      errorMessage = error.message || errorMessage;
+      errorDetails = error.details || {};
+    }
+    
     return new Response({
       sessionId,
       error: {
-        type: error.type || 'Error',
-        code: error.code || 'UNKNOWN_ERROR',
-        message: error.message || 'An unknown error occurred',
-        details: error.details || {}
+        type: errorType,
+        code: errorCode,
+        message: errorMessage,
+        details: errorDetails
       }
     });
   }
 
   /**
+   * Map error type to a standardized error code
+   * @param {string} errorType - Error type/name
+   * @returns {string} Standardized error code
+   * @private
+   */
+  static _mapErrorTypeToCode(errorType) {
+    // Map common error types to standard MCP error codes
+    const errorCodeMap = {
+      'ValidationError': 'VALIDATION_ERROR',
+      'NotFoundError': 'NOT_FOUND',
+      'ConnectionError': 'CONNECTION_ERROR',
+      'TimeoutError': 'TIMEOUT',
+      'ProtocolError': 'PROTOCOL_ERROR',
+      'ToolExecutionError': 'EXECUTION_ERROR',
+      'TypeError': 'INVALID_TYPE',
+      'RangeError': 'OUT_OF_RANGE',
+      'SyntaxError': 'SYNTAX_ERROR',
+      'ReferenceError': 'REFERENCE_ERROR'
+    };
+    
+    return errorCodeMap[errorType] || 'UNKNOWN_ERROR';
+  }
+
+  /**
    * Create a new Response instance
    * @param {Object} data - Response data
+   * @param {string} data.sessionId - Session identifier
+   * @param {Object} [data.result] - Response result data
+   * @param {Object} [data.error] - Error details
    */
   constructor(data) {
-    if (!data) {
-      throw new ValidationError('Response data is required');
+    if (!data || !data.sessionId) {
+      throw new Error('Response requires sessionId');
     }
     
-    // Validate response structure
-    const validatedData = validator.validate('mcpResponse', data);
-    
-    this.sessionId = validatedData.sessionId;
-    
-    if ('result' in validatedData) {
-      this.result = validatedData.result;
-    } else if ('error' in validatedData) {
-      this.error = validatedData.error;
-    } else {
-      throw new ValidationError('Response must contain either result or error');
+    // Validate that exactly one of result or error is provided
+    if (!data.result && !data.error) {
+      throw new Error('Response must include either result or error');
     }
     
-    this.id = validatedData.id || uuidv4();
-    this.timestamp = validatedData.timestamp || new Date().toISOString();
+    if (data.result && data.error) {
+      throw new Error('Response cannot include both result and error');
+    }
+    
+    this.sessionId = data.sessionId;
+    this.id = data.id || uuidv4();
+    this.timestamp = data.timestamp || new Date().toISOString();
+    
+    if (data.result !== undefined) {
+      this.result = data.result;
+    }
+    
+    if (data.error !== undefined) {
+      this.error = data.error;
+    }
   }
 
   /**
@@ -99,9 +153,11 @@ export class Response {
       timestamp: this.timestamp
     };
     
-    if (this.isSuccess()) {
+    if (this.result !== undefined) {
       obj.result = this.result;
-    } else {
+    }
+    
+    if (this.error !== undefined) {
       obj.error = this.error;
     }
     

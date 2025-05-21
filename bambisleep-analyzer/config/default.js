@@ -5,8 +5,9 @@
 export default {
   app: {
     name: 'bambisleep-analyzer',
-    version: '1.0.0',
-  },  mcp: {
+    version: '1.0.0'
+  },  
+  mcp: {
     servers: {
       milvus: {
         uri: 'http://127.0.0.1:19530',
@@ -48,25 +49,22 @@ export default {
         defaultViewport: { width: 1920, height: 1080 },
         timeout: 30000 // ms
       }
-    },
-    // New timeout management configuration
+    },    // New timeout management configuration
     timeouts: {
-      duckduckgo: 20000,
-      'duckduckgo.search': 25000,
-      fetch: 30000,
-      'fetch.fetch': 35000,
+      duckduckgo: 30000,
+      'duckduckgo.search': 45000,
+      fetch: 45000,
+      'fetch.fetch': 60000,
       memory: 5000,
       milvus: 15000,
       default: 30000
-    },
-    // New retry configuration
+    },    // New retry configuration
     retries: {
       duckduckgo: 3,
       fetch: 3,
       memory: 1,
       milvus: 2,
       default: 2
-    },
     }
   },
   logging: {

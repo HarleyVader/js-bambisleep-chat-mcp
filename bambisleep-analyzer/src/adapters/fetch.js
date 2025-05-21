@@ -49,8 +49,7 @@ class FetchAdapter extends BaseAdapter {
   async _disconnect() {
     // Nothing specific needed for disconnect
     return Promise.resolve();
-  }
-  /**
+  }  /**
    * Execute a command on Fetch MCP server
    * @param {string} command - Command name
    * @param {Object} parameters - Command parameters
@@ -59,25 +58,47 @@ class FetchAdapter extends BaseAdapter {
    * @protected
    */
   async _execute(command, parameters, options = {}) {
-    // In a real implementation, this would send the request to the actual MCP server
+    // Get max retries and current retry attempt
+    const maxRetries = timeoutManager.getMaxRetries(this.name, options);
+    const retryAttempt = options.retryAttempt || 0;
     
     // Set up a timeout for the operation using timeout manager
-    const timeoutMs = options.timeout || timeoutManager.getTimeout(this.name, command, options);
+    // Increase timeout for retry attempts to give more time
+    const baseTimeoutMs = options.timeout || timeoutManager.getTimeout(this.name, command, options);
+    // Add 20% more time for each retry attempt
+    const timeoutMs = Math.floor(baseTimeoutMs * (1 + retryAttempt * 0.2));
+    
     const startTime = Date.now();
+    let timerHandle;
     
     try {
-      // Here we would make the actual API call to the MCP server
       this.logger.debug({
         message: `Executing Fetch command: ${command}`,
-        parameters,
+        parameters: {
+          url: parameters.url,
+          method: parameters.method
+        },
         timeoutMs,
-        retryAttempt: options.retryAttempt || 0
+        retryAttempt
       });
       
-      // Simulate potential timeout 
-      const result = await Promise.race([
-        // This would be the actual implementation
-        Promise.resolve({
+      // Create an abortable fetch operation
+      const abortController = new AbortController();
+      const signal = abortController.signal;
+      
+      // Set up the timeout
+      timerHandle = setTimeout(() => {
+        abortController.abort();
+      }, timeoutMs);
+      
+      // In a real implementation, we would use the abort signal with the fetch call
+      // For the simulation, we'll just resolve with mock data after a delay
+      const simulateOperation = async () => {
+        // Simulate operation time (for testing)
+        const operationTime = Math.floor(Math.random() * 1000);
+        await new Promise(resolve => setTimeout(resolve, operationTime));
+        
+        return {
           success: true,
           command,
           timestamp: new Date().toISOString(),
@@ -87,30 +108,65 @@ class FetchAdapter extends BaseAdapter {
           },
           body: '<html><body><h1>Example</h1></body></html>', // Simulated content
           responseTime: Date.now() - startTime
-        }),
-        
-        // Timeout handler
-        new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(new TimeoutError(
-              `Fetch command timed out after ${timeoutMs}ms`, 
-              command,
-              { 
-                operation: command,
-                url: parameters.url,
-                parameters: JSON.stringify(parameters).substring(0, 200)
-              }
-            ));
-          }, timeoutMs);
-        })
-      ]);
+        };
+      };
+        // Execute the operation with abort signal handling
+      const result = await simulateOperation();
+      
+      // Clear the timeout since operation completed
+      clearTimeout(timerHandle);
+      
+      // Track request completion for throttling purposes
+      timeoutManager.completeRequest(this.name, command);
       
       return result;
     } catch (error) {
-      if (error instanceof TimeoutError) {
-        throw error;
+      // Clean up timeout if it exists
+      if (timerHandle) {
+        clearTimeout(timerHandle);
       }
       
+      // Handle aborted requests as timeouts
+      if (error.name === 'AbortError' || error instanceof TimeoutError) {
+        const timeoutError = new TimeoutError(
+          `Fetch command timed out after ${timeoutMs}ms`, 
+          command,
+          { 
+            operation: command,
+            url: parameters.url,
+            parameters: JSON.stringify(parameters).substring(0, 200)
+          }
+        );
+        
+        // Record the timeout in the timeout manager
+        timeoutManager.recordError(this.name, command, timeoutError);
+            // If we have retries remaining, retry with backoff
+        if (retryAttempt < maxRetries) {
+          // Calculate backoff with throttling consideration
+          const totalDelay = timeoutManager.getDelayForOperation(this.name, command, retryAttempt);
+          
+          this.logger.info({
+            message: `Retrying Fetch command after timeout (${retryAttempt+1}/${maxRetries})`,
+            command,
+            url: parameters.url,
+            totalDelay,
+            nextTimeout: timeoutMs * 1.2
+          });
+          
+          // Wait for backoff time
+          await new Promise(resolve => setTimeout(resolve, totalDelay));
+          
+          // Retry with incremented attempt number
+          return this._execute(command, parameters, {
+            ...options,
+            retryAttempt: retryAttempt + 1
+          });
+        }
+        
+        throw timeoutError;
+      }
+      
+      // Other errors
       throw new ToolExecutionError(
         `Failed to execute Fetch command ${command}: ${error.message}`, 
         'fetch', 

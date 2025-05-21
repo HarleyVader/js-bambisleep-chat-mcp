@@ -17,14 +17,12 @@ class Protocol {
   constructor() {
     logger.info('MCP Protocol initialized');
   }
-
   /**
    * Parse and validate an incoming MCP command
    * @param {Object|string} rawCommand - Raw command data
    * @returns {Command} Validated Command object
    * @throws {ProtocolError} If command fails validation
-   */
-  parseCommand(rawCommand) {
+   */  parseCommand(rawCommand) {
     try {
       // Parse if string
       let commandData = rawCommand;
@@ -39,10 +37,119 @@ class Protocol {
         }
       }
       
-      // Validate and create Command
-      return new Command(commandData);
+      // Ensure commandData is an object (be more permissive about object-like structures)
+      if (!commandData) {
+        throw new ProtocolError('Command data cannot be null or undefined', {
+          receivedType: typeof commandData
+        });
+      }
+      
+      // Try to normalize data if it's not a proper object
+      if (typeof commandData !== 'object') {
+        try {
+          commandData = { 
+            command: String(commandData),
+            sessionId: 'auto-generated',
+            parameters: {}
+          };
+          logger.warn({
+            message: 'Converted non-object command data to object',
+            originalType: typeof rawCommand
+          });
+        } catch (error) {
+          throw new ProtocolError('Command data must be convertible to object', {
+            receivedType: typeof commandData
+          });
+        }
+      }
+      
+      // Fix missing properties with defaults to be more resilient
+      if (!commandData.command) {
+        if (commandData.name) {
+          commandData.command = commandData.name;
+          logger.warn('Using "name" property as command name');
+        } else if (commandData.cmd) {
+          commandData.command = commandData.cmd;
+          logger.warn('Using "cmd" property as command name');
+        } else {
+          throw new ProtocolError('Missing required command name property', {
+            receivedCommand: JSON.stringify(commandData).substring(0, 100)
+          });
+        }
+      }
+      
+      if (!commandData.sessionId) {
+        // Auto-generate a sessionId if missing
+        commandData.sessionId = `auto-${Date.now()}`;
+        logger.warn({
+          message: 'Auto-generated sessionId for command',
+          commandName: commandData.command,
+          generatedSessionId: commandData.sessionId
+        });
+      }
+      
+      // Normalize parameters to ensure it's always an object
+      if (!commandData.parameters) {
+        commandData.parameters = {};
+      } else if (typeof commandData.parameters !== 'object') {
+        try {
+          // Try to parse if it's a string
+          if (typeof commandData.parameters === 'string') {
+            commandData.parameters = JSON.parse(commandData.parameters);
+          } else {
+            // Otherwise create an empty object
+            commandData.parameters = {};
+          }
+        } catch (error) {
+          commandData.parameters = {};
+          logger.warn({
+            message: 'Could not parse parameters, using empty object',
+            original: commandData.parameters
+          });
+        }
+      }
+      
+      // Log the command being processed for debugging
+      logger.debug({
+        message: 'Processing MCP command',
+        command: commandData.command,
+        sessionId: commandData.sessionId,
+        hasParameters: commandData.parameters ? true : false
+      });
+      
+      // Create Command with better error handling
+      try {
+        return new Command(commandData);
+      } catch (cmdError) {
+        logger.error({
+          message: 'Command constructor error',
+          error: cmdError.message,
+          commandData: {
+            command: commandData.command,
+            sessionId: commandData.sessionId
+          }
+        });
+        
+        // Try one more time with a simplified version
+        const simplifiedCommand = {
+          command: String(commandData.command || ''),
+          sessionId: String(commandData.sessionId || ''),
+          parameters: {}
+        };
+        
+        return new Command(simplifiedCommand);
+      }
     } catch (error) {
       if (error instanceof ValidationError) {
+        logger.error({
+          message: 'Command validation failed',
+          error: error.message,
+          details: error.details || {},
+          commandData: typeof rawCommand === 'object' ? 
+            { command: rawCommand.command, sessionId: rawCommand.sessionId } : 
+            'Invalid format'
+        });
+        
         throw new ProtocolError(`Invalid command format: ${error.message}`, {
           validationErrors: error.details?.errors || [],
           rawCommand: typeof rawCommand === 'string' ? rawCommand.substring(0, 100) : rawCommand
@@ -97,7 +204,18 @@ class Protocol {
           // Create a new session if not found or invalid
           session = sessionManager.createSession();
           command.sessionId = session.id; // Update command with new session ID
+          logger.info({
+            message: 'Created new session for command',
+            sessionId: session.id,
+            commandId: command.id
+          });
         } else {
+          logger.error({
+            message: 'Session error during command processing',
+            error: error.message,
+            stackTrace: error.stack,
+            commandId: command.id
+          });
           throw error;
         }
       }
@@ -114,13 +232,31 @@ class Protocol {
         parameters: command.parameters
       });
       
-      // Execute command implementation
-      const result = await implementation(command, session);
+      // Execute command implementation with timeout
+      let result;
+      try {
+        result = await implementation(command, session);
+      } catch (implError) {
+        commandLogger.error({
+          message: 'Command implementation failed',
+          error: implError.message,
+          stackTrace: implError.stack
+        });
+        throw implError;
+      }
       
       // Update session state if needed
-      if (result.sessionState) {
-        sessionManager.updateSession(command.sessionId, result.sessionState);
-        delete result.sessionState; // Remove from response
+      if (result && result.sessionState) {
+        try {
+          sessionManager.updateSession(command.sessionId, result.sessionState);
+          delete result.sessionState; // Remove from response
+        } catch (sessionError) {
+          commandLogger.error({
+            message: 'Failed to update session after command',
+            error: sessionError.message
+          });
+          // Continue with response even if session update fails
+        }
       }
       
       commandLogger.debug({
@@ -133,7 +269,12 @@ class Protocol {
       logger.error({
         message: `Command processing failed: ${error.message}`,
         command: command.toObject(),
-        error
+        error: {
+          name: error.name,
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        }
       });
       
       // Create error response

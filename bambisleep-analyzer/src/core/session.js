@@ -90,6 +90,17 @@ class SessionManager {
   }
 
   /**
+   * Get a snapshot of session state (immutable)
+   * @param {string} sessionId - Session identifier
+   * @returns {Object} Immutable copy of session state
+   * @throws {NotFoundError} If session not found
+   */
+  getSessionState(sessionId) {
+    const session = this.getSession(sessionId);
+    return this._cloneState(session.state);
+  }
+
+  /**
    * Update a session's state
    * @param {string} sessionId - Session identifier
    * @param {Object|Function} stateUpdates - New state object or update function
@@ -104,11 +115,15 @@ class SessionManager {
     // Apply state updates
     let newState;
     if (typeof stateUpdates === 'function') {
-      // If stateUpdates is a function, call it with current state
-      newState = stateUpdates(session.state);
+      // If stateUpdates is a function, call it with immutable copy of current state
+      const currentState = this._cloneState(session.state);
+      const updatedState = stateUpdates(currentState);
+      newState = this._cloneState(updatedState);
     } else {
-      // Otherwise merge current state with stateUpdates
-      newState = { ...session.state, ...stateUpdates };
+      // Otherwise merge current state with stateUpdates (both immutable)
+      const currentState = this._cloneState(session.state);
+      const updates = this._cloneState(stateUpdates);
+      newState = { ...currentState, ...updates };
     }
     
     // Update session
@@ -127,6 +142,25 @@ class SessionManager {
     });
     
     return updatedSession;
+  }
+
+  /**
+   * Create a deep clone of session state to ensure immutability
+   * @param {Object} state - State to clone
+   * @returns {Object} Deep cloned state
+   * @private
+   */
+  _cloneState(state) {
+    if (!state) return {};
+    try {
+      return JSON.parse(JSON.stringify(state));
+    } catch (error) {
+      logger.warn({
+        message: 'Failed to clone session state, returning empty object',
+        error: error.message
+      });
+      return {};
+    }
   }
 
   /**
@@ -155,17 +189,25 @@ class SessionManager {
     const now = new Date();
     let expiredCount = 0;
     
-    for (const [sessionId, session] of this.sessions.entries()) {
-      if (now > new Date(session.expiresAt)) {
-        this.sessions.delete(sessionId);
-        expiredCount++;
+    try {
+      for (const [sessionId, session] of this.sessions.entries()) {
+        if (now > new Date(session.expiresAt)) {
+          this.sessions.delete(sessionId);
+          expiredCount++;
+        }
       }
-    }
-    
-    if (expiredCount > 0) {
-      logger.debug({
-        message: `Cleaned up ${expiredCount} expired sessions`,
-        expiredCount
+      
+      if (expiredCount > 0) {
+        logger.info({
+          message: `Cleaned up ${expiredCount} expired sessions`,
+          activeSessionsCount: this.sessions.size
+        });
+      }
+    } catch (error) {
+      logger.error({
+        message: 'Error during session cleanup',
+        error: error.message,
+        stack: error.stack
       });
     }
   }
@@ -176,6 +218,55 @@ class SessionManager {
    */
   getSessionCount() {
     return this.sessions.size;
+  }
+
+  /**
+   * Get all active sessions (for dashboard/admin use)
+   * @returns {Array<Object>} Array of session objects with sanitized state
+   */
+  getAllSessions() {
+    const result = [];
+    for (const [sessionId, session] of this.sessions.entries()) {
+      // Only include non-expired sessions
+      if (new Date() <= new Date(session.expiresAt)) {
+        // Clone session and sanitize state for security
+        const sanitizedSession = {
+          ...session,
+          state: this._sanitizeSessionState(session.state)
+        };
+        result.push(sanitizedSession);
+      }
+    }
+    return result;
+  }
+  
+  /**
+   * Sanitize session state for public exposure
+   * @param {Object} state - Session state
+   * @returns {Object} Sanitized state
+   * @private
+   */
+  _sanitizeSessionState(state) {
+    // Create a sanitized copy of the state
+    const sanitized = this._cloneState(state);
+    
+    // Remove any sensitive fields
+    const sensitiveKeys = ['credentials', 'token', 'password', 'apiKey', 'secret'];
+    
+    const recursiveRemove = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      for (const key of Object.keys(obj)) {
+        if (sensitiveKeys.includes(key)) {
+          obj[key] = '[REDACTED]';
+        } else if (typeof obj[key] === 'object') {
+          recursiveRemove(obj[key]);
+        }
+      }
+    };
+    
+    recursiveRemove(sanitized);
+    return sanitized;
   }
 
   /**

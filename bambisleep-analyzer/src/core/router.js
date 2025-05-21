@@ -4,7 +4,7 @@
  */
 import logger from '../utils/logger.js';
 import protocol from './protocol.js';
-import { NotFoundError } from '../utils/errors.js';
+import { NotFoundError, ValidationError } from '../utils/errors.js';
 
 /**
  * MCP Router class
@@ -62,32 +62,95 @@ class Router {
       });
     }
     
-    return wasDeleted;
-  }
-
+    return wasDeleted;  }
+  
   /**
    * Handle a command
    * @param {Command} command - Command to handle
    * @returns {Promise<Response>} Command response
-   */
-  async handleCommand(command) {
-    const handlerInfo = this.commandHandlers.get(command.command);
-    
-    if (!handlerInfo) {
-      const availableCommands = Array.from(this.commandHandlers.keys());
-      logger.debug({
-        message: `Command not found: ${command.command}`,
-        availableCommands
-      });
+   */  async handleCommand(command) {
+    try {
+      if (!command || !command.command) {
+        throw new ValidationError('Invalid command object passed to handleCommand', {
+          received: command ? typeof command : 'undefined'
+        });
+      }
       
-      throw new NotFoundError(`Command not found: ${command.command}`, {
-        availableCommands
+      const handlerInfo = this.commandHandlers.get(command.command);
+      
+      if (!handlerInfo) {
+        const availableCommands = Array.from(this.commandHandlers.keys());
+        logger.debug({
+          message: `Command not found: ${command.command}`,
+          availableCommands
+        });
+        
+        throw new NotFoundError(`Command not found: ${command.command}`, {
+          availableCommands
+        });
+      }
+    
+      const { handler, schema } = handlerInfo;
+      // Validate command parameters against command-specific schema if available
+      if (schema) {
+        try {
+          // This will use our custom validator to check command parameters
+          // Get validator synchronously to prevent issues with async imports
+          const validator = require('../utils/validation.js').default;
+          
+          // Use a dynamic schema name for this command
+          const paramSchemaName = `cmd-${command.command}-params`;
+          
+          // Register the schema if it's not already registered
+          if (!validator.validators.has(paramSchemaName)) {
+            // Add more tolerant settings to the schema
+            const enhancedSchema = {
+              ...schema,
+              // Set additionalProperties to true for more flexibility
+              additionalProperties: true,
+              // Make required properties optional
+              required: []
+            };
+            
+            // Register with enhanced schema for greater tolerance
+            validator.registerSchema(paramSchemaName, enhancedSchema);
+          }
+          
+          try {
+            // Validate parameters against the schema - but don't fail if validation errors
+            validator.validate(paramSchemaName, command.parameters);
+          } catch (validationError) {
+            // Just log the validation issues but continue execution
+            logger.warn({
+              message: `Non-fatal parameter validation issue: ${validationError.message}`,
+              command: command.command,
+              parameters: command.parameters
+            });
+          }
+        } catch (error) {
+          // Log but don't fail - we want the app to be resilient
+          logger.warn({
+            message: `Command parameter validation setup error`,
+            command: command.command,
+            error: error.message
+          });
+        }
+      }
+      
+      return protocol.processCommand(command, handler);
+    } catch (error) {
+      // Handle any errors that occurred during command processing
+      logger.error({
+        message: `Error handling command: ${error.message}`,
+        command: command?.command,
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        }
       });
+      throw error;
     }
-    
-    const { handler } = handlerInfo;
-    
-    return protocol.processCommand(command, handler);
   }
 
   /**

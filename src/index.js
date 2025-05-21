@@ -185,8 +185,7 @@ async function startServer() {
     
     // Register analyzer commands
     registerAnalyzerCommands(router, adapters);
-    
-    // Register system info command
+      // Register system info command
     router.registerCommand('system.info', async (command) => {
       return {
         version: process.env.npm_package_version || '1.0.0',
@@ -198,7 +197,13 @@ async function startServer() {
         }))
       };
     }, {
-      description: 'Get system information'
+      description: 'Get system information',
+      schema: {
+        type: 'object',
+        properties: {
+          // No required parameters for this command
+        }
+      }
     });
     
         // Mount dashboard routes

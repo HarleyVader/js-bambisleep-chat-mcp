@@ -106,6 +106,9 @@ export class BaseAdapter {
    * @param {Object} parameters - Command parameters
    * @param {Object} [options={}] - Execution options
    * @returns {Promise<Object>} Command result
+   * @throws {ConnectionError} If connection fails
+   * @throws {TimeoutError} If execution times out
+   * @throws {ToolExecutionError} If execution fails
    */
   async execute(command, parameters, options = {}) {
     if (!this.connected) {
@@ -120,24 +123,35 @@ export class BaseAdapter {
     
     executionLogger.debug({
       message: 'Executing command',
-      parameters,
+      parameters: this._sanitizeParameters(parameters),
       options
     });
     
+    // Validate command and parameters
+    this._validateExecuteParams(command, parameters);
+    
     // Get retry configuration
-    const maxRetries = timeoutManager.getMaxRetries(this.name, options);
+    const maxRetries = options.maxRetries !== undefined 
+      ? options.maxRetries 
+      : timeoutManager.getMaxRetries(this.name, options);
+      
     let attemptCount = 0;
     let lastError = null;
     
     // Execution with retry logic
     while (attemptCount <= maxRetries) {
       try {
-        // Calculate timeout for this attempt (with backoff if it's a retry)
-        const timeoutMultiplier = attemptCount > 0 ? attemptCount : 1;
+        // Calculate timeout for this attempt (with progressive increase for retries)
+        // Base timeout from timeout manager
         const baseTimeout = timeoutManager.getTimeout(this.name, command, options);
-        const attemptTimeout = Math.min(baseTimeout * timeoutMultiplier, 120000); // Cap at 2 minutes
         
-        // Update options with current timeout
+        // For retries, increase by 30% each attempt
+        const timeoutMultiplier = attemptCount > 0 ? 1 + (attemptCount * 0.3) : 1;
+        
+        // Cap at 3 minutes to avoid excessive timeouts
+        const attemptTimeout = Math.min(baseTimeout * timeoutMultiplier, 180000);
+        
+        // Update options with current timeout and retry info
         const attemptOptions = {
           ...options,
           timeout: attemptTimeout,
@@ -146,73 +160,313 @@ export class BaseAdapter {
         
         // Log retry attempt if applicable
         if (attemptCount > 0) {
+          const backoffTime = timeoutManager.calculateBackoff(attemptCount - 1, this.name);
+          
           executionLogger.info({
             message: `Retry attempt ${attemptCount}/${maxRetries} for command ${command}`,
             timeout: attemptTimeout,
-            lastError: lastError ? lastError.message : null
+            backoffTime,
+            previousError: lastError?.message
+          });
+          
+          // Add a small delay between retries with progressive backoff
+          await new Promise(resolve => setTimeout(resolve, backoffTime));
+        }
+        
+        // Execute command with timeout
+        const result = await this._executeWithTimeout(command, parameters, attemptOptions);
+        
+        // If we succeeded after retries, log that for monitoring
+        if (attemptCount > 0) {
+          executionLogger.info({
+            message: `Command succeeded after ${attemptCount} retries`,
+            command,
+            totalAttempts: attemptCount + 1
           });
         }
         
-        // Execute the command
-        const result = await this._execute(command, parameters, attemptOptions);
-        
         executionLogger.debug({
           message: 'Command executed successfully',
-          retryAttempt: attemptCount
+          resultSize: this._calculateResultSize(result)
         });
         
-        // Add retry information to result if applicable
-        if (attemptCount > 0) {
-          return {
-            ...result,
-            _meta: {
-              retryCount: attemptCount,
-              originalError: lastError ? lastError.message : null
-            }
-          };
-        }
+        this._trackRequestCompletion(command);
         
         return result;
       } catch (error) {
         lastError = error;
         
-        // Record timeout errors
-        if (error instanceof TimeoutError || error.code === 'TIMEOUT_ERROR') {
-          timeoutManager.recordError(this.name, command, error);
+        // If connection error, try to reconnect
+        if (error instanceof ConnectionError) {
+          try {
+            this.connected = false;
+            await this.connect();
+          } catch (reconnectError) {
+            // Just log reconnect errors, will still retry the command
+            executionLogger.warn({
+              message: `Reconnect failed during retry: ${reconnectError.message}`
+            });
+          }
         }
         
-        // Check if we should retry
-        if (attemptCount < maxRetries && 
-            (error instanceof TimeoutError || 
-             error.code === 'TIMEOUT_ERROR' || 
-             error.code === 'CONNECTION_ERROR' ||
-             (options.retryableErrors && options.retryableErrors.includes(error.code)))) {
-          
-          attemptCount++;
-          
-          // Calculate backoff time
-          const backoffMs = timeoutManager.calculateBackoff(attemptCount, this.name);
-          
-          executionLogger.warn({
-            message: `Command failed, will retry in ${backoffMs}ms (${attemptCount}/${maxRetries})`,
-            error: error.message,
-            backoffMs
+        // Don't retry if it's not a retryable error or exceeded max retries
+        const isRetryable = this._isRetryableError(error);
+        const canRetry = attemptCount < maxRetries && isRetryable;
+        
+        if (!canRetry) {
+          executionLogger.error({
+            message: `Command execution failed after ${attemptCount} attempts: ${error.message}`,
+            retryable: isRetryable,
+            error: {
+              name: error.name,
+              message: error.message,
+              stack: error.stack
+            }
           });
           
-          // Wait before next attempt
-          await new Promise(resolve => setTimeout(resolve, backoffMs));
-          continue;
+          throw this._wrapExecutionError(error, command, parameters);
         }
         
-        // If we reach here, either we've exhausted retries or it's not a retryable error
-        executionLogger.error({
-          message: `Command execution failed: ${error.message}`,
-          error,
-          retryAttempts: attemptCount
-        });
-        
-        throw error;
+        // Prepare for next retry
+        attemptCount++;
       }
+    }
+    
+    // This should never be reached due to the throw above when !canRetry,
+    // but adding as a safeguard
+    const errorMessage = lastError?.message || 'Unknown error during command execution';
+    executionLogger.error({
+      message: `Command failed after all retries: ${errorMessage}`,
+      error: lastError
+    });
+    
+    throw this._wrapExecutionError(
+      lastError || new Error('Unknown error during command execution'),
+      command,
+      parameters
+    );
+  }
+
+  /**
+   * Validate command and parameters before execution
+   * @param {string} command - Command name
+   * @param {Object} parameters - Command parameters
+   * @throws {Error} If validation fails
+   * @protected
+   */
+  _validateExecuteParams(command, parameters) {
+    if (typeof command !== 'string' || !command) {
+      throw new Error('Command must be a non-empty string');
+    }
+    
+    if (parameters !== undefined && (parameters === null || typeof parameters !== 'object')) {
+      throw new Error('Parameters must be an object if provided');
+    }
+  }
+  /**
+   * Execute a command with timeout
+   * @param {string} command - Command name
+   * @param {Object} parameters - Command parameters
+   * @param {Object} options - Execution options
+   * @returns {Promise<Object>} Execution result
+   * @throws {TimeoutError} If execution times out
+   * @protected
+   */
+  async _executeWithTimeout(command, parameters, options = {}) {
+    const { timeout = 30000 } = options;
+    let timeoutId;
+    let abortController;
+    
+    try {
+      // Create an AbortController if supported
+      if (typeof AbortController !== 'undefined') {
+        abortController = new AbortController();
+        if (!options.signal) {
+          options = {
+            ...options,
+            signal: abortController.signal
+          };
+        }
+      }
+      
+      // Create a promise wrapper that can be safely aborted/cancelled
+      const executionPromise = new Promise((resolve, reject) => {
+        // Set timeout handler
+        timeoutId = setTimeout(() => {
+          const timeoutError = new TimeoutError(
+            `${this.name} command timed out after ${timeout}ms`, 
+            command,
+            { 
+              operation: command,
+              parameters: this._sanitizeParameters(parameters)
+            }
+          );
+          
+          // Record the timeout in the timeout manager for statistics
+          timeoutManager.recordError(this.name, command, timeoutError);
+          
+          // Abort the operation if possible
+          if (abortController) {
+            abortController.abort();
+          }
+          
+          reject(timeoutError);
+        }, timeout);
+        
+        // Execute the actual command
+        this._execute(command, parameters, options)
+          .then(resolve)
+          .catch(reject)
+          .finally(() => {
+            // Clear timeout to prevent memory leaks
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+          });
+      });
+      
+      // Wait for execution to complete
+      return await executionPromise;
+    } finally {
+      // Ensure timeout is cleared
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    }
+  }
+  /**
+   * Determine if an error is retryable
+   * @param {Error} error - The error to check
+   * @returns {boolean} True if the error is retryable
+   * @protected
+   */
+  _isRetryableError(error) {
+    // Always retry on timeouts
+    if (error instanceof TimeoutError || 
+        error.name === 'TimeoutError' || 
+        error.code === 'TIMEOUT_ERROR') {
+      return true;
+    }
+    
+    // Retry on connection errors
+    if (error instanceof ConnectionError || 
+        error.name === 'ConnectionError' || 
+        error.code === 'CONNECTION_ERROR') {
+      return true;
+    }
+    
+    // Retry on network-related errors
+    if (error.code && [
+      'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ESOCKETTIMEDOUT',
+      'ENOTFOUND', 'ENETUNREACH', 'EHOSTUNREACH', 'EPIPE', 'EAI_AGAIN'
+    ].includes(error.code)) {
+      return true;
+    }
+    
+    // Retry on HTTP error codes that indicate temporary issues
+    if (error.statusCode && [408, 425, 429, 500, 502, 503, 504, 507, 509].includes(error.statusCode)) {
+      return true;
+    }
+    
+    // Retry on AbortError (caused by timeouts)
+    if (error.name === 'AbortError') {
+      return true;
+    }
+    
+    // Retry if the error message suggests a transient issue
+    const transientErrorPatterns = [
+      /timeout/i, /timed? out/i, 
+      /retry/i, 
+      /temporarily unavailable/i, 
+      /connection (failed|dropped|reset)/i, 
+      /server (unavailable|overloaded|error)/i,
+      /network/i,
+      /rate limit/i, /throttl/i,
+      /econnreset/i, /econnrefused/i, /econntimeout/i
+    ];
+    
+    if (error.message && transientErrorPatterns.some(pattern => pattern.test(error.message))) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Wrap an execution error with more context
+   * @param {Error} error - Original error
+   * @param {string} command - Command name
+   * @param {Object} parameters - Command parameters
+   * @returns {Error} Wrapped error
+   * @protected
+   */
+  _wrapExecutionError(error, command, parameters) {
+    if (error instanceof TimeoutError || error instanceof ToolExecutionError) {
+      return error; // Already properly formatted
+    }
+    
+    return new ToolExecutionError(
+      `${this.name} execution failed: ${error.message}`,
+      this.name,
+      command,
+      {
+        originalError: error,
+        parameters: this._sanitizeParameters(parameters)
+      }
+    );
+  }
+
+  /**
+   * Sanitize parameters for logging (remove sensitive data)
+   * @param {Object} parameters - Original parameters
+   * @returns {Object} Sanitized parameters
+   * @protected
+   */
+  _sanitizeParameters(parameters) {
+    if (!parameters) return {};
+    
+    const result = { ...parameters };
+    
+    // Remove common sensitive fields
+    const sensitiveFields = ['password', 'token', 'apiKey', 'secret', 'auth', 'credentials'];
+    
+    for (const field of sensitiveFields) {
+      if (field in result) {
+        result[field] = '[REDACTED]';
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Calculate result size for logging
+   * @param {any} result - The result to measure
+   * @returns {Object} Size information
+   * @protected
+   */
+  _calculateResultSize(result) {
+    try {
+      if (!result) return { type: typeof result, isEmpty: true };
+      
+      if (Array.isArray(result)) {
+        return { type: 'array', length: result.length };
+      }
+      
+      if (typeof result === 'object') {
+        const keys = Object.keys(result);
+        return { type: 'object', keyCount: keys.length };
+      }
+      
+      if (typeof result === 'string') {
+        return { type: 'string', length: result.length };
+      }
+      
+      return { type: typeof result };
+    } catch (error) {
+      return { type: 'unknown', error: error.message };
     }
   }
 
@@ -274,6 +528,15 @@ export class BaseAdapter {
    */
   async _healthCheck() {
     throw new Error('_healthCheck() must be implemented by subclass');
+  }
+  
+  /**
+   * Track request completion and do any necessary cleanup
+   * @param {string} command - Command name 
+   */
+  _trackRequestCompletion(command) {
+    // Complete request tracking in timeout manager
+    timeoutManager.completeRequest(this.name, command);
   }
 }
 
