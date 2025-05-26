@@ -119,3 +119,21 @@
 {"level":"info","message":"Embedding service initialized successfully","service":"bambisleep-mcp","timestamp":"2025-05-26T12:08:38.353Z"}
 {"isRelevant":false,"level":"info","message":"Processing content","relevanceScore":0.5511,"service":"bambisleep-mcp","timestamp":"2025-05-26T12:08:38.354Z","title":"BambiSleep Wiki","wordCount":0}
 {"embeddingsGenerated":4,"level":"info","message":"Content processing completed","provider":"lmstudio","service":"bambisleep-mcp","timestamp":"2025-05-26T12:08:38.468Z"}
+{"duration":1634,"level":"info","message":"Scraped URL: https://bambisleep.info","success":true,"timestamp":"2025-05-26T12:13:53.803Z"}
+{"isRelevant":false,"level":"info","message":"Processing content","relevanceScore":0.5546500000000001,"service":"bambisleep-mcp","timestamp":"2025-05-26T12:13:53.816Z","title":"BambiSleep Wiki","wordCount":219}
+{"embeddingsGenerated":4,"level":"info","message":"Content processing completed","provider":"lmstudio","service":"bambisleep-mcp","timestamp":"2025-05-26T12:13:54.159Z"}
+{"embeddings":4,"level":"info","message":"Content processed and stored with embeddings","provider":"lmstudio","timestamp":"2025-05-26T12:13:54.159Z"}
+{"level":"info","message":"URL Scraper MCP Server running on port 3000","timestamp":"2025-05-26T12:21:37.513Z"}
+{"level":"info","message":"LM Studio integration endpoint: http://192.168.0.178:7777","timestamp":"2025-05-26T12:21:37.515Z"}
+{"level":"info","message":"URL Scraper MCP Server running on port 3001","timestamp":"2025-05-26T12:21:43.602Z"}
+{"level":"info","message":"LM Studio integration endpoint: http://192.168.0.178:7777","timestamp":"2025-05-26T12:21:43.605Z"}
+{"failed":1,"level":"info","message":"Batch scraped 1 URLs","successful":0,"timestamp":"2025-05-26T12:23:47.451Z"}
+{"duration":1531,"level":"info","message":"Scraped URL: https://bambisleep.info","success":true,"timestamp":"2025-05-26T12:24:37.784Z"}
+{"duration":436,"level":"info","message":"Scraped URL: https://bambicloud.com/trigger","success":true,"timestamp":"2025-05-26T12:24:49.025Z"}
+{"duration":430,"level":"info","message":"Scraped URL: https://bambicloud.com/trigger","success":true,"timestamp":"2025-05-26T12:24:54.771Z"}
+{"duration":70,"level":"info","message":"Scraped URL: https://www.reddit.com/r/BambiSleep/comments/yt0di0/updated_file_transcriptions_bambihypno_resources/","success":false,"timestamp":"2025-05-26T12:25:12.555Z"}
+{"duration":563,"level":"info","message":"Scraped URL: https://www.reddit.com/r/BambiSleep/comments/yt0di0/updated_file_transcriptions_bambihypno_resources/","success":true,"timestamp":"2025-05-26T12:25:16.240Z"}
+{"duration":471,"level":"info","message":"Scraped URL: https://www.reddit.com/r/BambiSleep/comments/yt0di0/updated_file_transcriptions_bambihypno_resources/","success":true,"timestamp":"2025-05-26T12:25:45.284Z"}
+{"duration":373,"level":"info","message":"Scraped URL: https://www.reddit.com/r/BambiSleep/comments/yt0di0/updated_file_transcriptions_bambihypno_resources/","success":true,"timestamp":"2025-05-26T12:25:49.530Z"}
+{"duration":909,"level":"info","message":"Scraped URL: https://www.reddit.com/r/BambiSleep","success":true,"timestamp":"2025-05-26T12:25:59.859Z"}
+{"duration":1314,"level":"info","message":"Scraped URL: https://www.reddit.com/r/BambiSleep","success":true,"timestamp":"2025-05-26T12:26:07.480Z"}

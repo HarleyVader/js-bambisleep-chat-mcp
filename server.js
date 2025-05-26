@@ -8,6 +8,7 @@ import winston from 'winston';
 
 import scraperRoutes from './routes/scraper.js';
 import mcpRoutes from './routes/mcp.js';
+import knowledgeBaseRoutes from './routes/knowledgeBase.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import EmbeddingService from './src/embeddingService.js';
 
@@ -81,6 +82,7 @@ app.locals.logger = logger;
 // Routes
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/mcp', mcpRoutes);
+app.use('/api/knowledge-base', knowledgeBaseRoutes);
 
 // OpenAI-compatible chat completions endpoint
 app.post('/v1/chat/completions', async (req, res) => {
@@ -260,6 +262,14 @@ app.get('/', (req, res) => {
 app.get('/enhanced', (req, res) => {
   res.render('enhanced', {
     title: 'Enhanced LM Studio URL Scraper MCP',
+    lmStudioUrl: LM_STUDIO_URL
+  });
+});
+
+// Knowledge base interface route
+app.get('/knowledge-base', (req, res) => {
+  res.render('knowledge-base', {
+    title: 'BambiSleep Knowledge Base',
     lmStudioUrl: LM_STUDIO_URL
   });
 });
