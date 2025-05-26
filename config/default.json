@@ -1,0 +1,58 @@
+{
+  "embedding": {
+    "providers": [
+      {
+        "name": "lmstudio",
+        "url": "http://192.168.0.178:7777",
+        "endpoint": "/v1/embeddings",
+        "model": "text-embedding-nomic-embed-text-v1.5@q8_0",
+        "dimensions": 1536,
+        "priority": 1
+      },
+      {
+        "name": "openai",
+        "url": "https://api.openai.com",
+        "endpoint": "/v1/embeddings",
+        "model": "text-embedding-3-small",
+        "dimensions": 1536,
+        "priority": 2
+      },
+      {
+        "name": "local",
+        "type": "mock",
+        "dimensions": 384,
+        "priority": 3
+      }
+    ],
+    "chunkSize": 512,
+    "overlap": 50,
+    "timeout": 30000,
+    "retryAttempts": 3
+  },
+  "scraper": {
+    "userAgent": "LMStudio-URL-Scraper-MCP/1.0",
+    "timeout": 30000,
+    "maxRetries": 3,
+    "respectRobots": true,
+    "rateLimit": {
+      "requests": 10,
+      "period": 60000
+    }
+  },
+  "analyzer": {
+    "relevanceThreshold": 0.7,
+    "bambisleepKeywords": [
+      "bambi", "bambisleep", "hypnosis", "trance", "conditioning",
+      "trigger", "training", "dom", "domination", "submission",
+      "playlist", "file", "audio", "session"
+    ]
+  },
+  "storage": {
+    "vectorStore": {
+      "type": "local",
+      "path": "./data/embeddings"
+    },
+    "compression": true,
+    "indexing": true
+  }
+}

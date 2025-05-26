@@ -1,0 +1,52 @@
+{
+  "emb_bb643c74a649": {
+    "id": "emb_bb643c74a649",
+    "filePath": "data\\embeddings\\emb_bb643c74a649.json",
+    "provider": "lmstudio",
+    "dimensions": 768,
+    "title": "Test BambiSleep Content",
+    "wordCount": 11,
+    "relevanceScore": 0.6077999999999999,
+    "savedAt": "2025-05-26T11:02:01.665Z"
+  },
+  "emb_80c1bfcc2318": {
+    "id": "emb_80c1bfcc2318",
+    "filePath": "data\\embeddings\\emb_80c1bfcc2318.json",
+    "provider": "lmstudio",
+    "dimensions": 768,
+    "title": "BambiSleep Wiki",
+    "wordCount": 76,
+    "relevanceScore": 1,
+    "savedAt": "2025-05-26T11:03:44.117Z"
+  },
+  "emb_2ec55563dd25": {
+    "id": "emb_2ec55563dd25",
+    "filePath": "data\\embeddings\\emb_2ec55563dd25.json",
+    "provider": "lmstudio",
+    "dimensions": 768,
+    "title": "BambiSleep Wiki",
+    "wordCount": 57,
+    "relevanceScore": 1,
+    "savedAt": "2025-05-26T11:03:44.135Z"
+  },
+  "emb_cd26b8f3a06d": {
+    "id": "emb_cd26b8f3a06d",
+    "filePath": "data\\embeddings\\emb_cd26b8f3a06d.json",
+    "provider": "lmstudio",
+    "dimensions": 768,
+    "title": "BambiSleep Wiki",
+    "wordCount": 77,
+    "relevanceScore": 1,
+    "savedAt": "2025-05-26T11:03:44.152Z"
+  },
+  "emb_d25486a5f814": {
+    "id": "emb_d25486a5f814",
+    "filePath": "data\\embeddings\\emb_d25486a5f814.json",
+    "provider": "lmstudio",
+    "dimensions": 768,
+    "title": "BambiSleep Wiki",
+    "wordCount": 38,
+    "relevanceScore": 1,
+    "savedAt": "2025-05-26T11:03:44.170Z"
+  }
+}

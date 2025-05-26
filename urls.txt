@@ -1,0 +1,9 @@
+# BambiSleep URLs for Scraping
+# Format: URL [priority] [tags]
+# Priority: 1 (highest) to 5 (lowest)
+# Tags: comma-separated list of relevance tags
+
+# Primary Sources
+https://bambisleep.info 1 official,main,index
+https://bambicloud.com/triggers 1 official,triggers,index
+https://www.reddit.com/r/BambiSleep/ 2 community,discussion,forum

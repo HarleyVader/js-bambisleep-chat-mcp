@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .status-badge { font-size: 0.8em; }
+        .content-preview { max-height: 200px; overflow-y: auto; }
+        .log-output { 
+            background: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            border-radius: 0.375rem; 
+            padding: 1rem; 
+            font-family: monospace; 
+            font-size: 0.875em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .url-input { min-height: 100px; }
+        .loading { display: none; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-globe"></i> <%= title %>
+            </span>
+            <span class="badge bg-success">
+                <i class="bi bi-cpu"></i> LM Studio: <%= lmStudioUrl %>
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Input Section -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-link-45deg"></i> URL Scraper</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Single URL Tab -->
+                        <ul class="nav nav-tabs" id="scraperTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="single-tab" data-bs-toggle="tab" data-bs-target="#single" type="button">
+                                    Single URL
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch" type="button">
+                                    Batch URLs
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content mt-3" id="scraperTabContent">
+                            <!-- Single URL -->
+                            <div class="tab-pane fade show active" id="single" role="tabpanel">
+                                <form id="singleUrlForm">
+                                    <div class="mb-3">
+                                        <label for="singleUrl" class="form-label">URL</label>
+                                        <input type="url" class="form-control" id="singleUrl" placeholder="https://example.com" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
+                                        Scrape URL
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <!-- Batch URLs -->
+                            <div class="tab-pane fade" id="batch" role="tabpanel">
+                                <form id="batchUrlForm">
+                                    <div class="mb-3">
+                                        <label for="batchUrls" class="form-label">URLs (one per line, max 50)</label>
+                                        <textarea class="form-control url-input" id="batchUrls" placeholder="https://example1.com&#10;https://example2.com" required></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <span class="loading spinner-border spinner-border-sm me-2" role="status"></span>
+                                        Scrape Batch
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Options -->
+                        <div class="mt-4">
+                            <h6>Options</h6>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="respectRobots" checked>
+                                <label class="form-check-label" for="respectRobots">
+                                    Respect robots.txt
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sendToLmStudio">
+                                <label class="form-check-label" for="sendToLmStudio">
+                                    Send to LM Studio
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MCP Tools -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6><i class="bi bi-tools"></i> MCP Tools</h6>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="loadMcpTools()">
+                            <i class="bi bi-arrow-clockwise"></i> Load Tools
+                        </button>
+                        <div id="mcpToolsList" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-file-text"></i> Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="results">
+                            <div class="text-muted text-center">
+                                <i class="bi bi-info-circle"></i>
+                                Enter a URL and click "Scrape URL" to see results here
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6><i class="bi bi-activity"></i> Activity Log</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="activityLog" class="log-output">
+                            <div class="text-muted">Activity log will appear here...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api';
+        let activityLog = [];
+
+        function logActivity(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            activityLog.unshift(logEntry);
+            
+            // Keep only last 50 entries
+            if (activityLog.length > 50) {
+                activityLog = activityLog.slice(0, 50);
+            }
+            
+            document.getElementById('activityLog').innerHTML = activityLog.join('\n');
+        }
+
+        async function scrapeSingleUrl(event) {
+            event.preventDefault();
+            
+            const urlInput = document.getElementById('singleUrl');
+            const url = urlInput.value.trim();
+            const respectRobots = document.getElementById('respectRobots').checked;
+            const sendToLmStudio = document.getElementById('sendToLmStudio').checked;
+            
+            if (!url) return;
+
+            // Show loading state
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const loadingSpinner = submitBtn.querySelector('.loading');
+            loadingSpinner.style.display = 'inline-block';
+            submitBtn.disabled = true;
+
+            logActivity(`Starting scrape of: ${url}`);
+
+            try {
+                const response = await fetch(`${API_BASE}/scraper/single`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url,
+                        options: { respectRobots }
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    logActivity(`Successfully scraped: ${url}`, 'success');
+                    displaySingleResult(result);
+                    
+                    if (sendToLmStudio) {
+                        await sendContentToLmStudio(result.content, result.metadata);
+                    }
+                } else {
+                    logActivity(`Failed to scrape: ${url} - ${result.error}`, 'error');
+                    displayError(result.error);
+                }
+
+            } catch (error) {
+                logActivity(`Error scraping ${url}: ${error.message}`, 'error');
+                displayError(error.message);
+            } finally {
+                loadingSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        }
+
+        async function scrapeBatchUrls(event) {
+            event.preventDefault();
+            
+            const urlsInput = document.getElementById('batchUrls');
+            const urlsText = urlsInput.value.trim();
+            const respectRobots = document.getElementById('respectRobots').checked;
+            const sendToLmStudio = document.getElementById('sendToLmStudio').checked;
+            
+            if (!urlsText) return;
+
+            const urls = urlsText.split('\n').map(url => url.trim()).filter(url => url);
+            
+            if (urls.length === 0) return;
+            if (urls.length > 50) {
+                alert('Maximum 50 URLs allowed per batch');
+                return;
+            }
+
+            // Show loading state
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const loadingSpinner = submitBtn.querySelector('.loading');
+            loadingSpinner.style.display = 'inline-block';
+            submitBtn.disabled = true;
+
+            logActivity(`Starting batch scrape of ${urls.length} URLs`);
+
+            try {
+                const response = await fetch(`${API_BASE}/scraper/batch`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        urls,
+                        options: { respectRobots, batchSize: 5 }
+                    })
+                });
+
+                const data = await response.json();
+                const results = data.results;
+                
+                const successful = results.filter(r => r.success).length;
+                const failed = results.filter(r => !r.success).length;
+                
+                logActivity(`Batch complete: ${successful} successful, ${failed} failed`, 'success');
+                displayBatchResults(results);
+                
+                if (sendToLmStudio) {
+                    for (const result of results.filter(r => r.success)) {
+                        await sendContentToLmStudio(result.content, result.metadata);
+                    }
+                }
+
+            } catch (error) {
+                logActivity(`Batch scrape error: ${error.message}`, 'error');
+                displayError(error.message);
+            } finally {
+                loadingSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        }
+
+        async function sendContentToLmStudio(content, metadata) {
+            try {
+                logActivity(`Sending content to LM Studio: ${metadata.url || 'unknown'}`);
+                
+                const response = await fetch(`${API_BASE}/mcp/send-to-lmstudio`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content, metadata })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    logActivity(`Content sent to LM Studio successfully`, 'success');
+                } else {
+                    logActivity(`Failed to send to LM Studio: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                logActivity(`LM Studio send error: ${error.message}`, 'error');
+            }
+        }
+
+        function displaySingleResult(result) {
+            const resultsDiv = document.getElementById('results');
+            const content = result.content;
+            
+            resultsDiv.innerHTML = `
+                <div class="result-item border rounded p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="mb-0">${escapeHtml(content.title || 'No Title')}</h6>
+                        <span class="badge bg-success status-badge">Success</span>
+                    </div>
+                    
+                    <div class="text-muted small mb-2">
+                        <i class="bi bi-link"></i> ${escapeHtml(result.url)}
+                    </div>
+                    
+                    ${content.description ? `<p class="text-muted small">${escapeHtml(content.description)}</p>` : ''}
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-6">
+                            <small class="text-muted">Word Count: <strong>${content.wordCount || 0}</strong></small>
+                        </div>
+                        <div class="col-sm-6">
+                            <small class="text-muted">Duration: <strong>${result.metadata?.duration || 0}ms</strong></small>
+                        </div>
+                    </div>
+                    
+                    ${content.headings && content.headings.length > 0 ? `
+                        <div class="mb-3">
+                            <h6>Headings:</h6>
+                            <ul class="list-unstyled">
+                                ${content.headings.slice(0, 5).map(h => 
+                                    `<li class="small">H${h.level}: ${escapeHtml(h.text)}</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="content-preview">
+                        <h6>Content Preview:</h6>
+                        <div class="small text-muted">
+                            ${escapeHtml(content.mainContent ? content.mainContent.substring(0, 500) + (content.mainContent.length > 500 ? '...' : '') : 'No content extracted')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayBatchResults(results) {
+            const resultsDiv = document.getElementById('results');
+            
+            const successful = results.filter(r => r.success);
+            const failed = results.filter(r => !r.success);
+            
+            resultsDiv.innerHTML = `
+                <div class="mb-3">
+                    <h6>Batch Results Summary</h6>
+                    <div class="row g-2">
+                        <div class="col-sm-6">
+                            <span class="badge bg-success">Successful: ${successful.length}</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="badge bg-danger">Failed: ${failed.length}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="results-list">
+                    ${results.map((result, index) => `
+                        <div class="result-item border rounded p-2 mb-2 ${result.success ? 'border-success' : 'border-danger'}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="flex-grow-1">
+                                    <div class="small fw-bold">
+                                        ${escapeHtml(result.content?.title || result.url)}
+                                    </div>
+                                    <div class="text-muted small">
+                                        ${escapeHtml(result.url)}
+                                    </div>
+                                    ${!result.success ? `<div class="text-danger small">${escapeHtml(result.error)}</div>` : ''}
+                                </div>
+                                <span class="badge ${result.success ? 'bg-success' : 'bg-danger'} status-badge">
+                                    ${result.success ? 'Success' : 'Failed'}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function displayError(error) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Error:</strong> ${escapeHtml(error)}
+                </div>
+            `;
+        }
+
+        async function loadMcpTools() {
+            try {
+                logActivity('Loading MCP tools...');
+                
+                const response = await fetch(`${API_BASE}/mcp/tools`);
+                const data = await response.json();
+                
+                const toolsList = document.getElementById('mcpToolsList');
+                toolsList.innerHTML = data.tools.map(tool => `
+                    <div class="small mb-1">
+                        <strong>${tool.name}</strong><br>
+                        <span class="text-muted">${tool.description}</span>
+                    </div>
+                `).join('');
+                
+                logActivity(`Loaded ${data.tools.length} MCP tools`, 'success');
+            } catch (error) {
+                logActivity(`Failed to load MCP tools: ${error.message}`, 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        document.getElementById('singleUrlForm').addEventListener('submit', scrapeSingleUrl);
+        document.getElementById('batchUrlForm').addEventListener('submit', scrapeBatchUrls);
+
+        // Load MCP tools on page load
+        loadMcpTools();
+        
+        // Initial log message
+        logActivity('URL Scraper MCP initialized');
+    </script>
+</body>
+</html>
