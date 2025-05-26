@@ -1,7 +1,7 @@
 // Enhanced fetcher with browser automation support
-import { URLScraper } from '../../lib/scraper.js';
+import URLScraper from '../../lib/scraper.js';
 import BrowserAutomation from './browser.js';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 
 export class EnhancedURLFetcher {
   constructor(options = {}) {
@@ -194,13 +194,11 @@ export class EnhancedURLFetcher {
     try {
       // Always try basic first unless preferBrowser is true
       if (!this.options.preferBrowser) {
-        basicResult = await this.fetchBasic(url, options);
-        
-        if (basicResult.success) {
+        basicResult = await this.fetchBasic(url, options);        if (basicResult.success) {
           // Check if content suggests JS requirement
           const needsBrowser = await this.detectJavaScriptRequirement(
             url, 
-            basicResult.data?.content?.mainContent
+            basicResult.data.content?.mainContent
           );
           
           if (!needsBrowser) {
@@ -402,5 +400,11 @@ export class EnhancedURLFetcher {
     await this.browserAutomation.cleanup();
   }
 }
+
+// Create a default instance for easy importing
+export const enhancedFetcher = new EnhancedURLFetcher();
+
+// Add convenience method for backward compatibility
+enhancedFetcher.fetchUrl = enhancedFetcher.smartFetch.bind(enhancedFetcher);
 
 export default EnhancedURLFetcher;

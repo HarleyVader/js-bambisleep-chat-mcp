@@ -1,3 +1,6 @@
+// Enhanced text processing module with support for BambiSleep content analysis
+import { calculateEnhancedRelevanceScore, categorizeContent } from './filters.js';
+
 export function cleanText(text) {
   if (!text || typeof text !== 'string') {
     return '';
@@ -90,11 +93,9 @@ export function processScrapedContent(scrapedData, config = {}) {
   const useEnhancedAnalysis = config.useEnhancedAnalysis !== false; // Default to true
   
   let relevanceScore, relevanceDetails, category;
-  
-  if (useEnhancedAnalysis) {
+    if (useEnhancedAnalysis) {
     // Use enhanced analysis if available
     try {
-      const { calculateEnhancedRelevanceScore, categorizeContent } = await import('./filters.js');
       const relevanceAnalysis = calculateEnhancedRelevanceScore(scrapedData.content || {});
       relevanceScore = relevanceAnalysis.score;
       relevanceDetails = relevanceAnalysis.details;
@@ -132,3 +133,57 @@ export function processScrapedContent(scrapedData, config = {}) {
   
   return processed;
 }
+
+// Enhanced text processing with async support for dynamic imports
+export const enhancedTextProcessor = {
+  async processText(text, options = {}) {
+    const { url, enhanced = false } = options;
+    
+    // Clean and prepare text
+    const cleanedText = cleanText(text);
+    
+    if (!enhanced) {
+      // Basic processing
+      return {
+        text: cleanedText,
+        analysis: {
+          relevanceScore: 0.5,
+          category: 'general',
+          keywordsFound: []
+        }
+      };
+    }
+    
+    try {
+      // Use enhanced analysis
+      const contentData = { mainContent: text, title: options.title || '', url };
+      const relevanceAnalysis = calculateEnhancedRelevanceScore(contentData);
+      const category = categorizeContent(contentData, relevanceAnalysis.details);
+      
+      return {
+        text: cleanedText,
+        analysis: {
+          relevanceScore: relevanceAnalysis.score,
+          qualityScore: relevanceAnalysis.qualityScore,
+          category: category.primary,
+          categoryConfidence: category.confidence,
+          keywordsFound: relevanceAnalysis.details.keywordsFound || [],
+          qualityIndicators: relevanceAnalysis.details.qualityIndicators || {},
+          enhanced: true
+        }
+      };
+    } catch (error) {
+      // Fallback to basic processing
+      return {
+        text: cleanedText,
+        analysis: {
+          relevanceScore: 0.5,
+          category: 'general',
+          keywordsFound: [],
+          error: 'Enhanced analysis failed, using fallback',
+          enhanced: false
+        }
+      };
+    }
+  }
+};

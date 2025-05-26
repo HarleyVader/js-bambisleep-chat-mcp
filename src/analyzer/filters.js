@@ -1,5 +1,5 @@
 // Enhanced content filtering and relevance scoring for BambiSleep content
-import { logger } from '../../src/utils/logger.js';
+// import logger from '../utils/logger.js';
 
 // Comprehensive BambiSleep-related keywords and their importance weights
 export const BAMBISLEEP_KEYWORDS = {
@@ -395,11 +395,10 @@ function getRecommendation(score, details) {
 /**
  * Filter content by relevance threshold with detailed analysis
  */
-export function filterByRelevance(contentArray, threshold = 0.4, options = {}) {
-  logger.info('Filtering content by relevance', { 
-    totalItems: contentArray.length, 
-    threshold 
-  });
+export function filterByRelevance(contentArray, threshold = 0.4, options = {}) {  // logger.info('Filtering content by relevance', { 
+  //   totalItems: contentArray.length, 
+  //   threshold 
+  // });
   
   const results = contentArray.map(item => {
     const relevanceAnalysis = calculateEnhancedRelevanceScore(item.content || item, options);
@@ -412,12 +411,11 @@ export function filterByRelevance(contentArray, threshold = 0.4, options = {}) {
       isRelevant: relevanceAnalysis.score >= threshold
     };
   }).filter(item => item.isRelevant);
-  
-  logger.info('Content filtering completed', {
-    originalCount: contentArray.length,
-    filteredCount: results.length,
-    rejectedCount: contentArray.length - results.length
-  });
+    // logger.info('Content filtering completed', {
+  //   originalCount: contentArray.length,
+  //   filteredCount: results.length,
+  //   rejectedCount: contentArray.length - results.length
+  // });
   
   return results;
 }

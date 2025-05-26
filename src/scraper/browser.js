@@ -1,6 +1,6 @@
 // Advanced browser automation for JavaScript-heavy sites using Playwright
 import { chromium, firefox, webkit } from 'playwright';
-import { logger } from '../../src/utils/logger.js';
+import logger from '../utils/logger.js';
 import UserAgent from 'user-agents';
 
 export class BrowserAutomation {
@@ -617,4 +617,173 @@ export class BrowserAutomation {
   }
 }
 
-export default BrowserAutomation;
+/**
+ * Browser Manager - High-level interface for browser automation
+ * Provides simplified methods for common browser automation tasks
+ */
+export class BrowserManager {
+  constructor(options = {}) {
+    this.automation = new BrowserAutomation(options);
+    this.activeSessions = new Map();
+  }
+  
+  /**
+   * Test a URL to determine if it needs browser automation
+   */
+  async testUrl(url, options = {}) {
+    try {
+      logger.info('Testing URL for browser requirements', { url });
+      
+      // Quick fetch to check for JavaScript indicators
+      const fetch = (await import('node-fetch')).default;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 10000
+      });
+      
+      const html = await response.text();
+      
+      // Analyze HTML content for JavaScript indicators
+      const jsIndicators = [
+        /<script[^>]*src=[^>]*>/gi,
+        /document\.addEventListener/gi,
+        /window\.onload/gi,
+        /jquery/gi,
+        /react/gi,
+        /angular/gi,
+        /vue/gi,
+        /spa-/gi,
+        /single-page/gi,
+        /dynamic-content/gi
+      ];
+      
+      let jsScore = 0;
+      for (const indicator of jsIndicators) {
+        const matches = html.match(indicator);
+        if (matches) {
+          jsScore += matches.length;
+        }
+      }
+      
+      // Check for dynamic content indicators
+      const dynamicIndicators = [
+        /data-react/gi,
+        /ng-/gi,
+        /v-/gi,
+        /\{\{[^}]+\}\}/gi,
+        /<%[^%]+%>/gi
+      ];
+      
+      let dynamicScore = 0;
+      for (const indicator of dynamicIndicators) {
+        const matches = html.match(indicator);
+        if (matches) {
+          dynamicScore += matches.length;
+        }
+      }
+      
+      const hasJavaScript = jsScore > 5;
+      const hasDynamicContent = dynamicScore > 0;
+      const needsBrowser = hasJavaScript || hasDynamicContent || html.length < 500;
+      
+      logger.info('URL analysis completed', {
+        url,
+        jsScore,
+        dynamicScore,
+        hasJavaScript,
+        hasDynamicContent,
+        needsBrowser,
+        htmlLength: html.length
+      });
+      
+      return {
+        hasJavaScript,
+        hasDynamicContent,
+        needsBrowser,
+        jsScore,
+        dynamicScore,
+        htmlLength: html.length,
+        recommendation: needsBrowser ? 'Use browser automation' : 'Standard fetching sufficient'
+      };
+      
+    } catch (error) {
+      logger.error('URL testing failed:', error);
+      return {
+        hasJavaScript: true,
+        hasDynamicContent: true,
+        needsBrowser: true,
+        error: error.message,
+        recommendation: 'Use browser automation (fallback due to test failure)'
+      };
+    }
+  }
+  
+  /**
+   * Fetch URL with browser automation
+   */
+  async fetchWithBrowser(url, options = {}) {
+    let sessionId = null;
+    
+    try {
+      logger.info('Fetching URL with browser automation', { url });
+      
+      // Create browser session
+      sessionId = await this.automation.createSession();
+      
+      // Navigate to URL
+      const navigationResult = await this.automation.navigateToUrl(sessionId, url, options);
+      
+      if (!navigationResult.success) {
+        throw new Error('Navigation failed');
+      }
+      
+      // Extract content
+      const content = await this.automation.extractContent(sessionId, options);
+      
+      // Extract metadata
+      const metadata = await this.automation.extractPageMetadata(this.automation.pages.get(sessionId));
+      
+      return {
+        success: true,
+        content: content.mainContent,
+        title: metadata.title,
+        metadata: {
+          ...metadata,
+          ...content,
+          method: 'browser',
+          browserUsed: true,
+          extractedAt: new Date().toISOString()
+        }
+      };
+      
+    } catch (error) {
+      logger.error('Browser fetch failed:', error);
+      return {
+        success: false,
+        error: error.message,
+        url
+      };
+    } finally {
+      if (sessionId) {
+        await this.automation.closeSession(sessionId);
+      }
+    }
+  }
+  
+  /**
+   * Clean up all browser resources
+   */
+  async cleanup() {
+    try {
+      await this.automation.cleanup();
+      this.activeSessions.clear();
+      logger.info('BrowserManager cleanup completed');
+    } catch (error) {
+      logger.error('BrowserManager cleanup failed:', error);
+    }
+  }
+}
+
+export default BrowserManager;
