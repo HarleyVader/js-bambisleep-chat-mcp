@@ -804,7 +804,12 @@ class EnhancedUI {
     
     // Chart Management
     initializeCharts() {
-        // Category Distribution Chart
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not loaded, skipping chart initialization');
+            return;
+        }
+
+        // Category distribution chart
         const categoryCtx = document.getElementById('categoryChart');
         if (categoryCtx) {
             this.charts.category = new Chart(categoryCtx, {
@@ -814,8 +819,8 @@ class EnhancedUI {
                     datasets: [{
                         data: [],
                         backgroundColor: [
-                            '#28a745', '#007bff', '#17a2b8', '#ffc107',
-                            '#6f42c1', '#343a40', '#dc3545', '#6c757d'
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
                         ]
                     }]
                 },
@@ -823,36 +828,15 @@ class EnhancedUI {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'bottom' }
+                        legend: {
+                            position: 'bottom'
+                        }
                     }
                 }
             });
         }
-        
-        // Relevance Distribution Chart
-        const relevanceCtx = document.getElementById('relevanceChart');
-        if (relevanceCtx) {
-            this.charts.relevance = new Chart(relevanceCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%'],
-                    datasets: [{
-                        label: 'Content Count',
-                        data: [0, 0, 0, 0, 0],
-                        backgroundColor: '#007bff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
-                }
-            });
-        }
-        
-        // Timeline Chart
+
+        // Timeline chart
         const timelineCtx = document.getElementById('timelineChart');
         if (timelineCtx) {
             this.charts.timeline = new Chart(timelineCtx, {
@@ -860,25 +844,20 @@ class EnhancedUI {
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'Successful Scrapes',
+                        label: 'Scraping Activity',
                         data: [],
-                        borderColor: '#28a745',
-                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                        fill: true
-                    }, {
-                        label: 'Failed Scrapes',
-                        data: [],
-                        borderColor: '#dc3545',
-                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                        fill: true
+                        borderColor: '#36A2EB',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        x: { type: 'time', time: { unit: 'hour' } },
-                        y: { beginAtZero: true }
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
             });
@@ -1061,6 +1040,66 @@ class EnhancedUI {
             URL.revokeObjectURL(url);
             this.logActivity('Single result exported', 'success');
         }
+    }
+
+    // Add missing displayError method
+    displayError(message) {
+        console.error(message);
+        
+        // Create or update error display element
+        let errorDiv = document.getElementById('error-display');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.id = 'error-display';
+            errorDiv.className = 'alert alert-danger mt-3';
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '20px';
+            errorDiv.style.right = '20px';
+            errorDiv.style.zIndex = '9999';
+            errorDiv.style.maxWidth = '400px';
+            document.body.appendChild(errorDiv);
+        }
+        
+        errorDiv.innerHTML = `
+            <strong>Error:</strong> ${message}
+            <button type="button" class="btn-close float-end" onclick="this.parentElement.remove()"></button>
+        `;
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (errorDiv && errorDiv.parentElement) {
+                errorDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Add missing displaySuccess method
+    displaySuccess(message) {
+        console.log(message);
+        
+        let successDiv = document.getElementById('success-display');
+        if (!successDiv) {
+            successDiv = document.createElement('div');
+            successDiv.id = 'success-display';
+            successDiv.className = 'alert alert-success mt-3';
+            successDiv.style.position = 'fixed';
+            successDiv.style.top = '20px';
+            successDiv.style.right = '20px';
+            successDiv.style.zIndex = '9999';
+            successDiv.style.maxWidth = '400px';
+            document.body.appendChild(successDiv);
+        }
+        
+        successDiv.innerHTML = `
+            <strong>Success:</strong> ${message}
+            <button type="button" class="btn-close float-end" onclick="this.parentElement.remove()"></button>
+        `;
+        
+        setTimeout(() => {
+            if (successDiv && successDiv.parentElement) {
+                successDiv.remove();
+            }
+        }, 3000);
     }
 }
 

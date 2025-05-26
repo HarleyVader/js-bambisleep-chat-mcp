@@ -192,4 +192,34 @@ router.post('/send-to-lmstudio', async (req, res) => {
   }
 });
 
+// Get embedding statistics
+router.get('/embedding-stats', async (req, res) => {
+  try {
+    const service = await initializeEmbeddingService();
+    const stats = await service.getStats();
+    res.json({ 
+      success: true, 
+      stats: {
+        totalEmbeddings: stats.totalEmbeddings || 0,
+        totalDocuments: stats.totalDocuments || 0,
+        averageRelevance: stats.averageRelevance || 0,
+        lastUpdated: stats.lastUpdated || new Date().toISOString(),
+        provider: stats.provider || 'unknown'
+      }
+    });
+  } catch (error) {
+    req.app.locals.logger.error('Error getting embedding stats:', error);
+    res.json({
+      success: false,
+      stats: {
+        totalEmbeddings: 0,
+        totalDocuments: 0,
+        averageRelevance: 0,
+        lastUpdated: new Date().toISOString(),
+        provider: 'unavailable'
+      }
+    });
+  }
+});
+
 export default router;
