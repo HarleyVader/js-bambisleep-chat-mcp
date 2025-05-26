@@ -86,7 +86,31 @@ export function summarizeContent(text, maxLength = 200) {
 
 export function processScrapedContent(scrapedData, config = {}) {
   const keywords = config.bambisleepKeywords || [];
-  const relevanceThreshold = config.relevanceThreshold || 0.7;
+  const relevanceThreshold = config.relevanceThreshold || 0.4;
+  const useEnhancedAnalysis = config.useEnhancedAnalysis !== false; // Default to true
+  
+  let relevanceScore, relevanceDetails, category;
+  
+  if (useEnhancedAnalysis) {
+    // Use enhanced analysis if available
+    try {
+      const { calculateEnhancedRelevanceScore, categorizeContent } = await import('./filters.js');
+      const relevanceAnalysis = calculateEnhancedRelevanceScore(scrapedData.content || {});
+      relevanceScore = relevanceAnalysis.score;
+      relevanceDetails = relevanceAnalysis.details;
+      category = categorizeContent(scrapedData.content || {}, relevanceDetails);
+    } catch (error) {
+      // Fallback to basic analysis
+      relevanceScore = calculateRelevanceScore(scrapedData.content, keywords);
+      relevanceDetails = { fallback: true, basicScore: relevanceScore };
+      category = { primary: 'unknown', confidence: 0.5 };
+    }
+  } else {
+    // Use basic analysis
+    relevanceScore = calculateRelevanceScore(scrapedData.content, keywords);
+    relevanceDetails = { basicScore: relevanceScore };
+    category = { primary: 'unknown', confidence: 0.5 };
+  }
   
   const processed = {
     ...scrapedData,
@@ -94,14 +118,17 @@ export function processScrapedContent(scrapedData, config = {}) {
       cleanedContent: cleanText(scrapedData.content?.mainContent || ''),
       cleanedTitle: cleanText(scrapedData.content?.title || ''),
       keyPhrases: extractKeyPhrases(scrapedData.content?.mainContent || '', keywords),
-      relevanceScore: calculateRelevanceScore(scrapedData.content, keywords),
+      relevanceScore,
+      relevanceDetails,
+      category,
       summary: summarizeContent(scrapedData.content?.mainContent || ''),
       wordCount: scrapedData.content?.wordCount || 0,
-      processedAt: new Date().toISOString()
+      processedAt: new Date().toISOString(),
+      analysisVersion: useEnhancedAnalysis ? 'enhanced' : 'basic'
     }
   };
   
-  processed.isRelevant = processed.processed.relevanceScore >= relevanceThreshold;
+  processed.isRelevant = relevanceScore >= relevanceThreshold;
   
   return processed;
 }
