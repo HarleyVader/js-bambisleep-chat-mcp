@@ -42,10 +42,23 @@
   "analyzer": {
     "relevanceThreshold": 0.7,
     "bambisleepKeywords": [
-      "bambi", "bambisleep", "hypnosis", "trance", "conditioning",
+      "bambi", "bambisleep", "hypnosis", "trance", "conditioning", 
       "trigger", "training", "dom", "domination", "submission",
-      "playlist", "file", "audio", "session"
-    ]
+      "playlist", "file", "audio", "session", "awakener", "induction",
+      "uniform", "bimbo", "sleep", "programming", "suggestion", "files",
+      "mantra", "curse", "awakener", "loop", "subject", "arousal", 
+      "blank", "mindless", "pleasure", "obedience", "surrender",
+      "relaxation", "transformation", "drone", "puppet", "mistress"
+    ],
+    "keywordWeighting": {
+      "primary": 1.5,
+      "secondary": 1.0,
+      "tertiary": 0.5
+    },
+    "contentClassification": {
+      "enabled": true,
+      "categories": ["guide", "experience", "technical", "general"]
+    }
   },
   "storage": {
     "vectorStore": {
