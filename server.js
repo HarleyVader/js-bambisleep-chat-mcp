@@ -256,6 +256,125 @@ app.get('/', (req, res) => {
   });
 });
 
+// Enhanced interface route
+app.get('/enhanced', (req, res) => {
+  res.render('enhanced', {
+    title: 'Enhanced LM Studio URL Scraper MCP',
+    lmStudioUrl: LM_STUDIO_URL
+  });
+});
+
+// Analytics API endpoints
+app.get('/api/analytics/stats', async (req, res) => {
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    
+    // Read processed data to generate stats
+    const dataDir = path.join(__dirname, 'data', 'processed');
+    let totalUrls = 0;
+    let categoryStats = {};
+    let relevanceStats = { high: 0, medium: 0, low: 0 };
+    let qualityStats = { good: 0, poor: 0 };
+    
+    try {
+      const files = await fs.readdir(dataDir);
+      const jsonFiles = files.filter(f => f.endsWith('.json'));
+      
+      for (const file of jsonFiles) {
+        try {
+          const filePath = path.join(dataDir, file);
+          const content = await fs.readFile(filePath, 'utf8');
+          const data = JSON.parse(content);
+          
+          if (data.analysis) {
+            totalUrls++;
+            
+            // Category stats
+            if (data.analysis.category) {
+              categoryStats[data.analysis.category] = (categoryStats[data.analysis.category] || 0) + 1;
+            }
+            
+            // Relevance stats
+            const relevance = data.analysis.relevanceScore || 0;
+            if (relevance >= 0.7) relevanceStats.high++;
+            else if (relevance >= 0.4) relevanceStats.medium++;
+            else relevanceStats.low++;
+            
+            // Quality stats
+            const quality = data.analysis.qualityScore || 0;
+            if (quality > 0) qualityStats.good++;
+            else qualityStats.poor++;
+          }
+        } catch (err) {
+          logger.warn(`Error processing file ${file}:`, err.message);
+        }
+      }
+    } catch (err) {
+      logger.warn('Error reading data directory:', err.message);
+    }
+    
+    res.json({
+      totalUrls,
+      categoryStats,
+      relevanceStats,
+      qualityStats,
+      lastUpdated: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    logger.error('Analytics stats error:', error);
+    res.status(500).json({ error: 'Failed to generate analytics stats' });
+  }
+});
+
+app.get('/api/analytics/activity', async (req, res) => {
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    
+    // Generate activity timeline from processed files
+    const dataDir = path.join(__dirname, 'data', 'processed');
+    const activityData = [];
+    
+    try {
+      const files = await fs.readdir(dataDir);
+      const jsonFiles = files.filter(f => f.endsWith('.json'));
+      
+      const dailyActivity = {};
+      
+      for (const file of jsonFiles) {
+        try {
+          const filePath = path.join(dataDir, file);
+          const stats = await fs.stat(filePath);
+          const date = stats.mtime.toISOString().split('T')[0];
+          
+          dailyActivity[date] = (dailyActivity[date] || 0) + 1;
+        } catch (err) {
+          logger.warn(`Error processing file ${file}:`, err.message);
+        }
+      }
+      
+      // Convert to array format for charts
+      Object.entries(dailyActivity).forEach(([date, count]) => {
+        activityData.push({ date, count });
+      });
+      
+      // Sort by date
+      activityData.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+    } catch (err) {
+      logger.warn('Error reading data directory:', err.message);
+    }
+    
+    res.json(activityData);
+    
+  } catch (error) {
+    logger.error('Analytics activity error:', error);
+    res.status(500).json({ error: 'Failed to generate activity data' });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 

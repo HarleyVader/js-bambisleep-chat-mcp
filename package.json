@@ -1,5 +1,5 @@
 {
-  "name": "lmstudio-url-scraper-mcp",
+  "name": "bambisleep-chat-mcp",
   "version": "1.0.0",
   "description": "URL scraper MCP toolset for LM Studio with web interface",
   "main": "server.js",
@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "test": "node test/test-scraper.js",
     "test:embeddings": "node scripts/test-embedding-pipeline.js",
+    "test:enhanced": "node scripts/test-enhanced.js",
     "scrape": "node scripts/scrape.js",
     "embed": "node scripts/embed.js",
     "setup": "node scripts/setup.js"

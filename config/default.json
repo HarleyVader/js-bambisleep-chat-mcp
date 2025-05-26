@@ -28,8 +28,7 @@
     "overlap": 50,
     "timeout": 30000,
     "retryAttempts": 3
-  },
-  "scraper": {
+  },  "scraper": {
     "userAgent": "LMStudio-URL-Scraper-MCP/1.0",
     "timeout": 30000,
     "maxRetries": 3,
@@ -37,10 +36,45 @@
     "rateLimit": {
       "requests": 10,
       "period": 60000
+    },
+    "browser": {
+      "headless": true,
+      "timeout": 30000,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "blockResources": ["image", "stylesheet", "font", "media"],
+      "sessionTimeout": 300000,
+      "maxSessions": 5
+    },
+    "enhanced": {
+      "enabled": true,
+      "jsDetection": true,
+      "dynamicContent": true,
+      "waitForSelector": 2000,
+      "fallbackToBasic": true
     }
-  },
-  "analyzer": {
+  },  "analyzer": {
     "relevanceThreshold": 0.7,
+    "enhanced": {
+      "enabled": true,
+      "categoryDetection": true,
+      "qualityScoring": true,
+      "keywordWeighting": true,
+      "contentFiltering": true
+    },
+    "categories": {
+      "hypnosis-content": ["hypnosis", "trance", "induction", "conditioning"],
+      "transformation": ["transformation", "bimbo", "feminization", "sissification"],
+      "audio-files": ["file", "audio", "session", "playlist", "track"],
+      "community": ["forum", "discussion", "community", "chat", "discord"],
+      "guides": ["guide", "tutorial", "howto", "instructions", "manual"],
+      "experiences": ["experience", "report", "story", "journey", "session"],
+      "tools": ["tool", "software", "app", "program", "generator"],
+      "general": ["general", "misc", "other", "uncategorized"]
+    },
     "bambisleepKeywords": [
       "bambi", "bambisleep", "hypnosis", "trance", "conditioning", 
       "trigger", "training", "dom", "domination", "submission",

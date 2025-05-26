@@ -23,15 +23,19 @@
         .loading { display: none; }
     </style>
 </head>
-<body>
-    <nav class="navbar navbar-dark bg-dark">
+<body>    <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">
                 <i class="bi bi-globe"></i> <%= title %>
             </span>
-            <span class="badge bg-success">
-                <i class="bi bi-cpu"></i> LM Studio: <%= lmStudioUrl %>
-            </span>
+            <div class="d-flex align-items-center gap-3">
+                <a href="/enhanced" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-speedometer2"></i> Enhanced Interface
+                </a>
+                <span class="badge bg-success">
+                    <i class="bi bi-cpu"></i> LM Studio: <%= lmStudioUrl %>
+                </span>
+            </div>
         </div>
     </nav>
 
